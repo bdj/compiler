@@ -154,7 +154,8 @@
   (set! fail-count (add1 fail-count)))
 
 (define (test-scan s expected)
-  (define actual (with-input-from-string s tokens))
+  (define actual (with-handlers [(exn:fail? (λ (e) (exn-message e)))] 
+                  (with-input-from-string s tokens)))
   (if (equal? expected actual)
       (passed!)
       (failed! expected actual)))
@@ -170,5 +171,6 @@
 (test-scan "hoohaw" (list (identifier-token 'hoohaw)))
 (test-scan "#\\h" (list (character-token #\h))) 
 (test-scan "#\\space" (list (character-token #\space)))
+(test-scan "1234a" "scan: Unexpected char #\\a")
 
 (printf "~a tests passed~n~a tests failed~n" pass-count fail-count)
