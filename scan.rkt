@@ -1,10 +1,17 @@
 #lang racket
 (require (for-syntax unstable/syntax))
+
+(provide scan)
+
 (struct token () #:transparent)
+(provide (struct-out token))
 
 (define-for-syntax (define-tokens stx fields)
   (define (define-token t)
-    #`(struct #,(format-id t "~a-token" t) token #,fields #:transparent))
+    (define id (format-id t "~a-token" t))
+    #`(begin
+        (struct #,id token #,fields #:transparent)
+        (provide (struct-out #,id))))
   (syntax-case stx ()
     [(_ t)
      (define-token #'t)]
@@ -139,38 +146,3 @@
         (scan-error s)))
   (start))
 
-(define (tokens)
-  (define t (scan))
-  (if (eof-token? t)
-      empty
-      (cons t (tokens))))
-
-(define pass-count 0)
-(define fail-count 0)
-(define (passed!)
-  (set! pass-count (add1 pass-count)))
-(define (failed! s ts)
-  (printf "expected: ~s, actual: ~s~n" s ts)
-  (set! fail-count (add1 fail-count)))
-
-(define (test-scan s expected)
-  (define actual (with-handlers [(exn:fail? (λ (e) (exn-message e)))] 
-                  (with-input-from-string s tokens)))
-  (if (equal? expected actual)
-      (passed!)
-      (failed! expected actual)))
-
-(test-scan 
- "(\"hello\" \"world\") ; here is a comment
-(#f #t) ; more stuff" (list (lparen-token) (string-token "hello") (string-token "world") (rparen-token)
-                            (lparen-token) (boolean-token #f) (boolean-token #t) (rparen-token)))
-
-(test-scan "1234" (list (number-token 1234)))
-(test-scan "-1234" (list (number-token -1234)))
-(test-scan "h" (list (identifier-token 'h)))
-(test-scan "hoohaw" (list (identifier-token 'hoohaw)))
-(test-scan "#\\h" (list (character-token #\h))) 
-(test-scan "#\\space" (list (character-token #\space)))
-(test-scan "1234a" "scan: Unexpected char #\\a")
-
-(printf "~a tests passed~n~a tests failed~n" pass-count fail-count)
